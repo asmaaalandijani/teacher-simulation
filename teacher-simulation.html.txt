@@ -1,0 +1,559 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teacher Performance Simulation Dashboard</title>
+    <style>
+        *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+        html, body { height: 100vh; overflow: hidden; font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background: #0f172a; color: #e2e8f0; }
+        .dashboard { display: flex; height: 100vh; }
+        .controls {
+            width: 290px; min-width: 290px; background: #1e293b; padding: 16px 18px;
+            display: flex; flex-direction: column; gap: 10px;
+            border-right: 2px solid #334155; overflow-y: auto;
+        }
+        .controls::-webkit-scrollbar { width: 4px; }
+        .controls::-webkit-scrollbar-thumb { background: #475569; border-radius: 2px; }
+        .brand { display: flex; align-items: center; gap: 10px; margin-bottom: 2px; }
+        .brand h1 { font-size: 15px; color: #f43f5e; line-height: 1.3; }
+        .brand-sub { font-size: 11px; color: #64748b; margin-bottom: 6px; }
+        .control-group { display: flex; flex-direction: column; gap: 3px; }
+        .control-row { display: flex; justify-content: space-between; align-items: center; }
+        .control-group label { font-size: 11.5px; color: #94a3b8; font-weight: 600; letter-spacing: 0.3px; }
+        .control-group .hint { font-size: 10px; color: #475569; margin-top: -2px; }
+        .control-group .val { font-size: 13px; color: #f43f5e; font-weight: 700; min-width: 55px; text-align: right; }
+        input[type="range"] {
+            width: 100%; height: 6px; -webkit-appearance: none; appearance: none;
+            background: #334155; border-radius: 3px; outline: none;
+        }
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none; width: 16px; height: 16px;
+            background: #f43f5e; border-radius: 50%; cursor: pointer;
+            box-shadow: 0 0 6px rgba(244,63,94,0.4);
+        }
+        input[type="range"]::-moz-range-thumb {
+            width: 16px; height: 16px; background: #f43f5e;
+            border-radius: 50%; cursor: pointer; border: none;
+        }
+        select {
+            background: #334155; color: #e2e8f0; border: 1px solid #475569;
+            padding: 6px 8px; border-radius: 5px; font-size: 12px; cursor: pointer;
+        }
+        select:focus { border-color: #f43f5e; outline: none; }
+        .btn-group { display: flex; gap: 8px; margin-top: 6px; }
+        #runBtn {
+            flex: 1; background: linear-gradient(135deg, #f43f5e, #e11d48); color: #fff;
+            border: none; padding: 10px; border-radius: 6px; font-size: 14px;
+            font-weight: 700; cursor: pointer; letter-spacing: 0.5px;
+            transition: all 0.2s; box-shadow: 0 2px 12px rgba(244,63,94,0.3);
+        }
+        #runBtn:hover { transform: translateY(-1px); box-shadow: 0 4px 20px rgba(244,63,94,0.4); }
+        #runBtn:active { transform: translateY(0); }
+        #runBtn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+        #resetBtn {
+            background: #334155; color: #94a3b8; border: 1px solid #475569;
+            padding: 10px 14px; border-radius: 6px; font-size: 13px; cursor: pointer;
+            transition: all 0.2s;
+        }
+        #resetBtn:hover { background: #475569; color: #e2e8f0; }
+        .divider { height: 1px; background: #334155; margin: 2px 0; }
+        .main { flex: 1; display: flex; flex-direction: column; padding: 14px 18px; min-width: 0; }
+        .results { display: flex; gap: 12px; margin-bottom: 10px; }
+        .result-card {
+            flex: 1; background: #1e293b; padding: 10px 14px; border-radius: 8px;
+            text-align: center; border: 1px solid #334155; transition: border-color 0.3s;
+        }
+        .result-card.highlight { border-color: #f43f5e; }
+        .result-card .lbl { font-size: 10px; color: #64748b; text-transform: uppercase; letter-spacing: 0.8px; font-weight: 600; }
+        .result-card .num { font-size: 26px; font-weight: 800; color: #f1f5f9; line-height: 1.2; margin: 2px 0; }
+        .result-card .num.accent { color: #f43f5e; }
+        .result-card .sub { font-size: 10px; color: #475569; }
+        .result-card .num.teal { color: #06b6d4; }
+        .result-card .num.amber { color: #f59e0b; }
+        .chart-wrap { flex: 1; position: relative; background: #1e293b; border-radius: 8px; border: 1px solid #334155; overflow: hidden; min-height: 0; }
+        .chart-wrap canvas { display: block; }
+        .bottom { margin-top: 8px; }
+        .pct-bar-wrap { margin-bottom: 6px; }
+        .pct-bar { height: 20px; border-radius: 10px; overflow: hidden; display: flex; background: #334155; }
+        .pct-bar .seg-above { background: linear-gradient(90deg, #22d3ee, #0284c7); transition: width 0.3s; }
+        .pct-bar .seg-below { background: linear-gradient(90deg, #fbbf24, #ea580c); transition: width 0.3s; }
+        .pct-labels { display: flex; justify-content: space-between; margin-top: 3px; font-size: 10.5px; font-weight: 600; }
+        .pct-labels .above-lbl { color: #22d3ee; }
+        .pct-labels .below-lbl { color: #fbbf24; }
+        .year-row { display: flex; align-items: center; gap: 10px; margin-top: 4px; }
+        .year-row label { font-size: 11px; color: #94a3b8; font-weight: 600; white-space: nowrap; }
+        .year-row input[type="range"] { flex: 1; }
+        .year-row .val { font-size: 12px; color: #f43f5e; font-weight: 700; min-width: 60px; }
+        .legend { display: flex; gap: 18px; justify-content: center; margin-top: 6px; }
+        .legend-item { display: flex; align-items: center; gap: 5px; font-size: 11px; color: #94a3b8; }
+        .legend-swatch { width: 14px; height: 14px; border-radius: 3px; }
+        .year-overlay {
+            position: absolute; top: 12px; right: 18px;
+            font-size: 32px; font-weight: 900; color: rgba(244,63,94,0.25);
+            pointer-events: none; letter-spacing: 1px;
+        }
+    </style>
+</head>
+<body>
+<div class="dashboard">
+    <div class="controls">
+        <div class="brand"><h1>Teacher Performance<br>Simulation</h1></div>
+        <div class="brand-sub">Ministry of Education &mdash; 537,000 Teachers</div>
+        <div class="divider"></div>
+        <div class="control-group">
+            <div class="control-row"><label>Acceptable Standard</label><span class="val" id="vStd">5.0</span></div>
+            <input type="range" id="iStd" min="1" max="10" step="0.5" value="5">
+            <div class="hint">Minimum performance threshold (1–10)</div>
+        </div>
+        <div class="control-group">
+            <label>Performance Curve</label>
+            <select id="iCurve">
+                <option value="bell">Bell Curve (Normal)</option>
+                <option value="scurve">S-Curve (Logistic)</option>
+                <option value="leftskew">Left Skewed (More Low)</option>
+                <option value="rightskew">Right Skewed (More High)</option>
+                <option value="uniform">Uniform</option>
+            </select>
+        </div>
+        <div class="control-group">
+            <div class="control-row"><label>Annual Turnover</label><span class="val" id="vTurn">15,000</span></div>
+            <input type="range" id="iTurn" min="0" max="60000" step="1000" value="15000">
+            <div class="hint">Teachers leaving per year</div>
+        </div>
+        <div class="control-group">
+            <div class="control-row"><label>New Teachers / Year</label><span class="val" id="vEntry">20,000</span></div>
+            <input type="range" id="iEntry" min="0" max="60000" step="1000" value="20000">
+            <div class="hint">Joining at or above standard</div>
+        </div>
+        <div class="control-group">
+            <div class="control-row"><label>Professional Dev. / Year</label><span class="val" id="vPD">10,000</span></div>
+            <input type="range" id="iPD" min="0" max="50000" step="1000" value="10000">
+            <div class="hint">Trained &amp; upgraded annually</div>
+        </div>
+        <div class="control-group">
+            <div class="control-row"><label>Societal Pressure Rate</label><span class="val" id="vSP">2.0%</span></div>
+            <input type="range" id="iSP" min="0" max="10" step="0.5" value="2">
+            <div class="hint">Peer-influence improvement factor</div>
+        </div>
+        <div class="divider"></div>
+        <div class="control-group">
+            <div class="control-row"><label>Target % Above Standard</label><span class="val" id="vTarget">90%</span></div>
+            <input type="range" id="iTarget" min="50" max="100" step="5" value="90">
+        </div>
+        <div class="btn-group">
+            <button id="runBtn">&#9654; Run Simulation</button>
+            <button id="resetBtn">&#8634; Reset</button>
+        </div>
+    </div>
+    <div class="main">
+        <div class="results">
+            <div class="result-card" id="cardYear">
+                <div class="lbl">Simulation Year</div>
+                <div class="num accent" id="rYear">0</div>
+                <div class="sub" id="rTotal">537,000 teachers</div>
+            </div>
+            <div class="result-card">
+                <div class="lbl">Above Standard</div>
+                <div class="num teal" id="rAbove">&mdash;</div>
+                <div class="sub" id="rAboveSub"></div>
+            </div>
+            <div class="result-card">
+                <div class="lbl">Below Standard</div>
+                <div class="num amber" id="rBelow">&mdash;</div>
+                <div class="sub" id="rBelowSub"></div>
+            </div>
+            <div class="result-card">
+                <div class="lbl">Years to Target</div>
+                <div class="num accent" id="rYTT">&mdash;</div>
+                <div class="sub" id="rYTTSub"></div>
+            </div>
+        </div>
+        <div class="chart-wrap" id="chartWrap">
+            <canvas id="chart"></canvas>
+            <div class="year-overlay" id="yearOverlay"></div>
+        </div>
+        <div class="bottom">
+            <div class="pct-bar-wrap">
+                <div class="pct-bar">
+                    <div class="seg-above" id="barAbove" style="width:50%"></div>
+                    <div class="seg-below" id="barBelow" style="width:50%"></div>
+                </div>
+                <div class="pct-labels">
+                    <span class="above-lbl" id="lblAbove">Above: —</span>
+                    <span class="below-lbl" id="lblBelow">Below: —</span>
+                </div>
+            </div>
+            <div class="year-row">
+                <label>Select Year:</label>
+                <input type="range" id="iYear" min="0" max="50" value="0" disabled>
+                <span class="val" id="vYear">Year 0</span>
+            </div>
+            <div class="legend">
+                <div class="legend-item"><div class="legend-swatch" style="background:linear-gradient(90deg,#22d3ee,#0284c7)"></div>Above Standard</div>
+                <div class="legend-item"><div class="legend-swatch" style="background:linear-gradient(90deg,#fbbf24,#ea580c)"></div>Below Standard</div>
+                <div class="legend-item"><div class="legend-swatch" style="background:#f43f5e"></div>Standard Threshold</div>
+            </div>
+        </div>
+    </div>
+</div>
+<script>
+const TOTAL = 537000;
+const BINS = 200;
+const SMIN = 1, SMAX = 10, SRANGE = SMAX - SMIN;
+const MAX_YEARS = 80;
+let simFrames = [];
+let yearTarget = -1;
+let animTimer = null;
+let isAnimating = false;
+let displayYear = 0;
+const $ = id => document.getElementById(id);
+const canvas = $('chart');
+const ctx = canvas.getContext('2d');
+function fmt(n) { return n.toLocaleString('en-US'); }
+function pct(n) { return n.toFixed(1) + '%'; }
+function getParams() {
+    return {
+        standard:  parseFloat($('iStd').value),
+        curve:     $('iCurve').value,
+        turnover:  parseInt($('iTurn').value),
+        entry:     parseInt($('iEntry').value),
+        profDev:   parseInt($('iPD').value),
+        pressure:  parseFloat($('iSP').value),
+        targetPct: parseInt($('iTarget').value)
+    };
+}
+function stdBin(standard) {
+    return Math.min(BINS - 1, Math.max(0, Math.floor((standard - SMIN) / SRANGE * BINS)));
+}
+function generateDist(curve, total) {
+    const d = new Array(BINS);
+    for (let i = 0; i < BINS; i++) {
+        const x = SMIN + (i + 0.5) / BINS * SRANGE;
+        switch (curve) {
+            case 'bell': {
+                const mu = 5.0, sig = 1.8;
+                d[i] = Math.exp(-0.5 * ((x - mu) / sig) ** 2);
+                break;
+            }
+            case 'scurve': {
+                const k = 1.3, x0 = 5.5;
+                const ex = Math.exp(-k * (x - x0));
+                d[i] = k * ex / (1 + ex) ** 2;
+                break;
+            }
+            case 'leftskew': {
+                const t = (x - SMIN) / SRANGE;
+                d[i] = Math.pow(t, 1.5) * Math.pow(1 - t, 4.5);
+                break;
+            }
+            case 'rightskew': {
+                const t = (x - SMIN) / SRANGE;
+                d[i] = Math.pow(t, 4.5) * Math.pow(1 - t, 1.5);
+                break;
+            }
+            case 'uniform':
+                d[i] = 1;
+                break;
+        }
+    }
+    const sum = d.reduce((a, b) => a + b, 0);
+    for (let i = 0; i < BINS; i++) d[i] = Math.round(d[i] / sum * total);
+    const cur = d.reduce((a, b) => a + b, 0);
+    d[Math.floor(BINS / 2)] += total - cur;
+    return d;
+}
+function stats(dist, standard) {
+    const sb = stdBin(standard);
+    let above = 0, below = 0;
+    for (let i = 0; i < BINS; i++) {
+        if (i >= sb) above += dist[i]; else below += dist[i];
+    }
+    const total = above + below;
+    return { above, below, total, abovePct: total > 0 ? above / total * 100 : 0 };
+}
+function simStep(dist, p) {
+    const d = dist.slice();
+    const sb = stdBin(p.standard);
+    let total = d.reduce((a, b) => a + b, 0);
+    if (p.turnover > 0 && total > 0) {
+        const remove = Math.min(p.turnover, total);
+        const w = new Array(BINS);
+        let wSum = 0;
+        for (let i = 0; i < BINS; i++) {
+            w[i] = d[i] * (1 + 0.3 * (1 - i / BINS));
+            wSum += w[i];
+        }
+        if (wSum > 0) {
+            for (let i = 0; i < BINS; i++) {
+                const r = Math.min(d[i], Math.round(w[i] / wSum * remove));
+                d[i] -= r;
+            }
+        }
+    }
+    if (p.entry > 0) {
+        const center = Math.min(sb + BINS * 0.06, BINS - 1);
+        const sigma = BINS * 0.08;
+        const ew = new Array(BINS).fill(0);
+        let eSum = 0;
+        for (let i = sb; i < BINS; i++) {
+            ew[i] = Math.exp(-0.5 * ((i - center) / sigma) ** 2);
+            eSum += ew[i];
+        }
+        if (eSum > 0) {
+            for (let i = 0; i < BINS; i++) d[i] += Math.round(ew[i] / eSum * p.entry);
+        }
+    }
+    if (p.profDev > 0) {
+        let remaining = p.profDev;
+        let moved = 0;
+        for (let i = sb - 1; i >= 0 && remaining > 0; i--) {
+            const m = Math.min(d[i], remaining);
+            d[i] -= m;
+            moved += m;
+            remaining -= m;
+        }
+        if (moved > 0) {
+            const spread = Math.max(1, Math.floor(BINS * 0.06));
+            const perBin = Math.floor(moved / spread);
+            const rem = moved - perBin * spread;
+            for (let j = 0; j < spread; j++) {
+                const t = Math.min(sb + j, BINS - 1);
+                d[t] += perBin + (j < rem ? 1 : 0);
+            }
+        }
+    }
+    if (p.pressure > 0) {
+        total = d.reduce((a, b) => a + b, 0);
+        let above = 0;
+        for (let i = sb; i < BINS; i++) above += d[i];
+        const aboveRatio = total > 0 ? above / total : 0;
+        const rate = (p.pressure / 100) * aboveRatio;
+        const shift = Math.max(1, Math.ceil(BINS * 0.08));
+        const deltas = new Array(BINS).fill(0);
+        for (let i = 0; i < sb; i++) {
+            const imp = Math.floor(d[i] * rate);
+            if (imp > 0) {
+                deltas[i] -= imp;
+                deltas[Math.min(i + shift, BINS - 1)] += imp;
+            }
+        }
+        for (let i = 0; i < BINS; i++) d[i] += deltas[i];
+    }
+    for (let i = 0; i < BINS; i++) if (d[i] < 0) d[i] = 0;
+    return d;
+}
+function runFullSim() {
+    const p = getParams();
+    let dist = generateDist(p.curve, TOTAL);
+    let s = stats(dist, p.standard);
+    simFrames = [{ dist: dist.slice(), ...s }];
+    yearTarget = s.abovePct >= p.targetPct ? 0 : -1;
+    for (let y = 1; y <= MAX_YEARS; y++) {
+        dist = simStep(dist, p);
+        s = stats(dist, p.standard);
+        simFrames.push({ dist: dist.slice(), ...s });
+        if (yearTarget < 0 && s.abovePct >= p.targetPct) yearTarget = y;
+        if (s.abovePct >= 99.8) break;
+    }
+    return yearTarget;
+}
+function drawChart(frame, standard, year) {
+    const wrap = $('chartWrap');
+    const dpr = window.devicePixelRatio || 1;
+    const W = wrap.clientWidth, H = wrap.clientHeight;
+    canvas.width = W * dpr;
+    canvas.height = H * dpr;
+    canvas.style.width = W + 'px';
+    canvas.style.height = H + 'px';
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    const pad = { t: 36, r: 24, b: 40, l: 56 };
+    const cW = W - pad.l - pad.r;
+    const cH = H - pad.t - pad.b;
+    ctx.clearRect(0, 0, W, H);
+    const dist = frame.dist;
+    const maxV = Math.max(...dist) * 1.12;
+    const sb = stdBin(standard);
+    const xOf = i => pad.l + (i / BINS) * cW;
+    const yOf = v => pad.t + cH - (v / maxV) * cH;
+    ctx.strokeStyle = '#1e3a5f';
+    ctx.lineWidth = 0.5;
+    for (let i = 0; i <= 9; i++) {
+        const x = pad.l + (i / 9) * cW;
+        ctx.beginPath(); ctx.moveTo(x, pad.t); ctx.lineTo(x, pad.t + cH); ctx.stroke();
+    }
+    for (let i = 0; i <= 4; i++) {
+        const y = pad.t + (i / 4) * cH;
+        ctx.beginPath(); ctx.moveTo(pad.l, y); ctx.lineTo(pad.l + cW, y); ctx.stroke();
+    }
+    const gradBelow = ctx.createLinearGradient(pad.l, 0, xOf(sb), 0);
+    gradBelow.addColorStop(0, 'rgba(234,88,12,0.75)');
+    gradBelow.addColorStop(1, 'rgba(251,191,36,0.75)');
+    ctx.fillStyle = gradBelow;
+    ctx.beginPath();
+    ctx.moveTo(xOf(0), yOf(0));
+    for (let i = 0; i <= sb && i < BINS; i++) ctx.lineTo(xOf(i), yOf(dist[i]));
+    ctx.lineTo(xOf(Math.min(sb, BINS - 1)), yOf(0));
+    ctx.closePath();
+    ctx.fill();
+    const gradAbove = ctx.createLinearGradient(xOf(sb), 0, xOf(BINS), 0);
+    gradAbove.addColorStop(0, 'rgba(34,211,238,0.75)');
+    gradAbove.addColorStop(1, 'rgba(2,132,199,0.75)');
+    ctx.fillStyle = gradAbove;
+    ctx.beginPath();
+    ctx.moveTo(xOf(sb), yOf(0));
+    for (let i = sb; i < BINS; i++) ctx.lineTo(xOf(i), yOf(dist[i]));
+    ctx.lineTo(xOf(BINS - 1), yOf(0));
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(241,245,249,0.45)';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(xOf(0), yOf(dist[0]));
+    for (let i = 1; i < BINS; i++) ctx.lineTo(xOf(i), yOf(dist[i]));
+    ctx.stroke();
+    const sx = xOf(sb);
+    ctx.strokeStyle = '#f43f5e';
+    ctx.lineWidth = 2;
+    ctx.setLineDash([6, 4]);
+    ctx.beginPath(); ctx.moveTo(sx, pad.t); ctx.lineTo(sx, pad.t + cH); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = '#f43f5e';
+    ctx.font = 'bold 11px Segoe UI, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('Standard: ' + standard.toFixed(1), sx, pad.t - 8);
+    ctx.fillStyle = '#64748b';
+    ctx.font = '11px Segoe UI, sans-serif';
+    ctx.textAlign = 'center';
+    for (let i = 1; i <= 10; i++) {
+        const x = pad.l + ((i - 1) / 9) * cW;
+        ctx.fillText(i, x, pad.t + cH + 18);
+    }
+    ctx.fillText('Performance Score', pad.l + cW / 2, pad.t + cH + 34);
+    ctx.textAlign = 'right';
+    ctx.fillStyle = '#64748b';
+    for (let i = 0; i <= 4; i++) {
+        const v = maxV * (4 - i) / 4;
+        const y = pad.t + (i / 4) * cH;
+        let label;
+        if (v >= 1000) label = (v / 1000).toFixed(v >= 10000 ? 0 : 1) + 'K';
+        else label = Math.round(v).toString();
+        ctx.fillText(label, pad.l - 8, y + 4);
+    }
+    ctx.save();
+    ctx.translate(14, pad.t + cH / 2);
+    ctx.rotate(-Math.PI / 2);
+    ctx.textAlign = 'center';
+    ctx.fillText('Teachers per Bin', 0, 0);
+    ctx.restore();
+    $('yearOverlay').textContent = year !== undefined ? 'Year ' + year : '';
+}
+function updateSliderLabels() {
+    $('vStd').textContent = parseFloat($('iStd').value).toFixed(1);
+    $('vTurn').textContent = fmt(parseInt($('iTurn').value));
+    $('vEntry').textContent = fmt(parseInt($('iEntry').value));
+    $('vPD').textContent = fmt(parseInt($('iPD').value));
+    $('vSP').textContent = parseFloat($('iSP').value).toFixed(1) + '%';
+    $('vTarget').textContent = parseInt($('iTarget').value) + '%';
+}
+function showFrame(year) {
+    if (!simFrames.length) return;
+    year = Math.min(year, simFrames.length - 1);
+    const f = simFrames[year];
+    const p = getParams();
+    drawChart(f, p.standard, year);
+    $('rYear').textContent = year;
+    $('rTotal').textContent = fmt(f.total) + ' teachers';
+    $('rAbove').textContent = pct(f.abovePct);
+    $('rAboveSub').textContent = fmt(f.above) + ' teachers';
+    $('rBelow').textContent = pct(100 - f.abovePct);
+    $('rBelowSub').textContent = fmt(f.below) + ' teachers';
+    if (yearTarget >= 0) {
+        $('rYTT').textContent = yearTarget;
+        $('rYTTSub').textContent = 'to reach ' + p.targetPct + '% above';
+    } else {
+        $('rYTT').textContent = '>' + MAX_YEARS;
+        $('rYTTSub').textContent = 'target not reached';
+    }
+    $('barAbove').style.width = f.abovePct + '%';
+    $('barBelow').style.width = (100 - f.abovePct) + '%';
+    $('lblAbove').textContent = 'Above: ' + pct(f.abovePct);
+    $('lblBelow').textContent = 'Below: ' + pct(100 - f.abovePct);
+    $('vYear').textContent = 'Year ' + year;
+    $('iYear').value = year;
+    $('cardYear').classList.toggle('highlight', isAnimating);
+}
+function stopAnim() {
+    if (animTimer) { clearTimeout(animTimer); animTimer = null; }
+    isAnimating = false;
+    $('runBtn').textContent = '\u25B6 Run Simulation';
+    $('runBtn').disabled = false;
+    $('iYear').disabled = false;
+    $('cardYear').classList.remove('highlight');
+}
+function animate() {
+    runFullSim();
+    isAnimating = true;
+    displayYear = 0;
+    $('runBtn').textContent = '\u23F8 Running...';
+    $('runBtn').disabled = true;
+    $('iYear').max = simFrames.length - 1;
+    $('iYear').disabled = true;
+    function step() {
+        showFrame(displayYear);
+        if (displayYear >= simFrames.length - 1) {
+            stopAnim();
+            $('iYear').disabled = false;
+            return;
+        }
+        displayYear++;
+        animTimer = setTimeout(step, 200);
+    }
+    step();
+}
+function showInitial() {
+    stopAnim();
+    const p = getParams();
+    const dist = generateDist(p.curve, TOTAL);
+    const s = stats(dist, p.standard);
+    simFrames = [{ dist, ...s }];
+    yearTarget = -1;
+    displayYear = 0;
+    $('iYear').max = 0;
+    $('iYear').value = 0;
+    $('iYear').disabled = true;
+    showFrame(0);
+    $('rYTT').textContent = '\u2014';
+    $('rYTTSub').textContent = 'run simulation first';
+}
+['iStd','iTurn','iEntry','iPD','iSP','iTarget'].forEach(id => {
+    $(id).addEventListener('input', () => { updateSliderLabels(); showInitial(); });
+});
+$('iCurve').addEventListener('change', () => showInitial());
+$('runBtn').addEventListener('click', () => {
+    if (isAnimating) { stopAnim(); return; }
+    animate();
+});
+$('resetBtn').addEventListener('click', () => {
+    $('iStd').value = 5; $('iTurn').value = 15000; $('iEntry').value = 20000;
+    $('iPD').value = 10000; $('iSP').value = 2; $('iTarget').value = 90;
+    $('iCurve').value = 'bell';
+    updateSliderLabels();
+    showInitial();
+});
+$('iYear').addEventListener('input', () => {
+    displayYear = parseInt($('iYear').value);
+    showFrame(displayYear);
+});
+let resizeTimer;
+window.addEventListener('resize', () => {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(() => {
+        if (simFrames.length) showFrame(displayYear);
+    }, 100);
+});
+updateSliderLabels();
+showInitial();
+</script>
+</body>
+</html>
